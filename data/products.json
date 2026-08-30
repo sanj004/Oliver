@@ -1,0 +1,62 @@
+[
+    {
+      "id": "p1",
+      "name": "Cotton Crew Neck Tee",
+      "price": 599,
+      "currency": "INR",
+      "category": "top",
+      "color": "black",
+      "sizes_available": ["S", "M", "L"],
+      "stock": 12,
+      "description": "100% cotton, machine washable crew neck t-shirt.",
+      "pairs_with": ["p3"]
+    },
+    {
+      "id": "p2",
+      "name": "Premium Cotton Tee",
+      "price": 749,
+      "currency": "INR",
+      "category": "top",
+      "color": "black",
+      "sizes_available": ["S", "M", "L", "XL"],
+      "stock": 8,
+      "description": "Heavier fabric, reinforced stitching, 2-year wear warranty.",
+      "pairs_with": ["p3"]
+    },
+    {
+      "id": "p3",
+      "name": "Jogger Pants",
+      "price": 499,
+      "currency": "INR",
+      "category": "bottom",
+      "color": "black",
+      "sizes_available": ["S", "M", "L"],
+      "stock": 10,
+      "description": "Comfortable everyday joggers with elastic waistband.",
+      "pairs_with": ["p1"]
+    },
+    {
+      "id": "p4",
+      "name": "Red Graphic Tee",
+      "price": 649,
+      "currency": "INR",
+      "category": "top",
+      "color": "red",
+      "sizes_available": ["S", "M"],
+      "stock": 0,
+      "description": "Graphic print tee. Currently out of stock in most sizes.",
+      "pairs_with": []
+    },
+    {
+      "id": "p5",
+      "name": "Denim Jacket",
+      "price": 1499,
+      "currency": "INR",
+      "category": "outerwear",
+      "color": "blue",
+      "sizes_available": ["M", "L", "XL"],
+      "stock": 5,
+      "description": "Classic denim jacket, unlined.",
+      "pairs_with": []
+    }
+  ]
