@@ -5,15 +5,20 @@ Uses Claude with tool-calling: the LLM decides which function to call
 conversation, and we execute those functions server-side with
 guardrails + audit logging wrapped around every money-affecting step.
 """
-import anthropic
-from config import ANTHROPIC_API_KEY
+from openai import OpenAI
 import catalog
 import orders as orders_db
 import payments
 import guardrails
 import audit
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+# Ollama exposes an OpenAI-compatible API locally -- no API key needed.
+client = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama",  # required by the library but unused by Ollama
+)
+
+MODEL_NAME = "llama3.1:8b"
 
 SYSTEM_PROMPT = """You are a shopping assistant for TeeStore, a small clothing store.
 You help customers find and buy products using the available tools.
@@ -32,49 +37,61 @@ Rules you must always follow:
 
 TOOLS = [
     {
-        "name": "search_products",
-        "description": "Search the product catalog by keyword, max price, size, or color.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Keyword to search for, e.g. 'tee', 'jacket'"},
-                "max_price": {"type": "number", "description": "Maximum price in INR"},
-                "size": {"type": "string", "description": "Size filter, e.g. 'M'"},
-                "color": {"type": "string", "description": "Color filter, e.g. 'black'"},
+        "type": "function",
+        "function": {
+            "name": "search_products",
+            "description": "Search the product catalog by keyword, max price, size, or color.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Keyword to search for, e.g. 'tee', 'jacket'"},
+                    "max_price": {"type": "number", "description": "Maximum price in INR"},
+                    "size": {"type": "string", "description": "Size filter, e.g. 'M'"},
+                    "color": {"type": "string", "description": "Color filter, e.g. 'black'"},
+                },
             },
         },
     },
     {
-        "name": "get_pairing_suggestions",
-        "description": "Get complementary products that pair well with a given product ID, for upsell suggestions.",
-        "input_schema": {
-            "type": "object",
-            "properties": {"product_id": {"type": "string"}},
-            "required": ["product_id"],
+        "type": "function",
+        "function": {
+            "name": "get_pairing_suggestions",
+            "description": "Get complementary products that pair well with a given product ID, for upsell suggestions.",
+            "parameters": {
+                "type": "object",
+                "properties": {"product_id": {"type": "string"}},
+                "required": ["product_id"],
+            },
         },
     },
     {
-        "name": "create_order",
-        "description": "Create an order for a product. This does NOT charge payment yet -- it just reserves the order and returns the total to confirm with the user.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "product_id": {"type": "string"},
-                "quantity": {"type": "integer"},
+        "type": "function",
+        "function": {
+            "name": "create_order",
+            "description": "Create an order for a product. This does NOT charge payment yet -- it just reserves the order and returns the total to confirm with the user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {"type": "string"},
+                    "quantity": {"type": "integer"},
+                },
+                "required": ["product_id", "quantity"],
             },
-            "required": ["product_id", "quantity"],
         },
     },
     {
-        "name": "confirm_payment",
-        "description": "Charge payment for a previously created order. Only call this AFTER the user has explicitly confirmed they want to pay.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "order_id": {"type": "string"},
-                "user_confirmed": {"type": "boolean", "description": "Must be true, based on an explicit user 'yes'"},
+        "type": "function",
+        "function": {
+            "name": "confirm_payment",
+            "description": "Charge payment for a previously created order. Only call this AFTER the user has explicitly confirmed they want to pay.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "order_id": {"type": "string"},
+                    "user_confirmed": {"type": "boolean", "description": "Must be true, based on an explicit user 'yes'"},
+                },
+                "required": ["order_id", "user_confirmed"],
             },
-            "required": ["order_id", "user_confirmed"],
         },
     },
 ]
@@ -161,36 +178,43 @@ def execute_tool(tool_name: str, tool_input: dict, session_id: str):
 
 def chat(session_id: str, conversation_history: list, user_message: str):
     """
-    Runs one turn of the agent loop: sends the conversation to Claude,
-    executes any tool calls, feeds results back, and returns the final
-    text reply plus the updated history.
+    Runs one turn of the agent loop: sends the conversation to the local
+    Ollama model, executes any tool calls, feeds results back, and
+    returns the final text reply plus the updated history.
     """
+    if not conversation_history:
+        conversation_history = [{"role": "system", "content": SYSTEM_PROMPT}]
+
     messages = conversation_history + [{"role": "user", "content": user_message}]
 
     while True:
-        response = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            tools=TOOLS,
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
             messages=messages,
+            tools=TOOLS,
         )
 
-        if response.stop_reason != "tool_use":
-            final_text = "".join(block.text for block in response.content if block.type == "text")
-            messages.append({"role": "assistant", "content": response.content})
-            return final_text, messages
+        choice = response.choices[0]
+        message = choice.message
 
-        messages.append({"role": "assistant", "content": response.content})
+        if not message.tool_calls:
+            messages.append({"role": "assistant", "content": message.content})
+            return message.content, messages
 
-        tool_results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                result = execute_tool(block.name, block.input, session_id)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": str(result),
-                })
+        messages.append({
+            "role": "assistant",
+            "content": message.content,
+            "tool_calls": [tc.model_dump() for tc in message.tool_calls],
+        })
 
-        messages.append({"role": "user", "content": tool_results})
+        for tool_call in message.tool_calls:
+            import json
+            tool_name = tool_call.function.name
+            tool_input = json.loads(tool_call.function.arguments)
+            result = execute_tool(tool_name, tool_input, session_id)
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": str(result),
+            })

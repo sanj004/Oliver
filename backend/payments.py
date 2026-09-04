@@ -31,7 +31,25 @@ def create_razorpay_order(amount_inr: float, receipt: str):
     """
     Creates an order on Razorpay in test mode.
     amount_inr is in rupees; Razorpay wants paise (multiply by 100).
+
+    TEMPORARY MOCK MODE: if Razorpay keys aren't configured yet (e.g. KYC
+    pending), we simulate a successful order response instead of calling
+    the real API. This lets the rest of the agent (guardrails, audit,
+    upsell, etc.) be built and demoed without being blocked. Swap this
+    out once real Razorpay test keys are available.
     """
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        import uuid
+        mock_order_id = f"mock_order_{uuid.uuid4().hex[:10]}"
+        return {
+            "id": mock_order_id,
+            "amount": int(amount_inr * 100),
+            "currency": "INR",
+            "receipt": receipt,
+            "status": "created",
+            "mocked": True,
+        }
+
     client = get_client()
     order = client.order.create({
         "amount": int(amount_inr * 100),

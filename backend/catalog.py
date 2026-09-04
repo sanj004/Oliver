@@ -20,17 +20,20 @@ def get_product(product_id: str):
 
 
 def search_products(query: str = "", max_price: float = None, size: str = None, color: str = None):
-    """
-    Simple keyword + filter search. Good enough for a hackathon demo --
-    swap for embeddings/vector search later if you want to get fancy.
-    """
     results = get_all_products()
     query = (query or "").lower().strip()
 
+    if max_price is not None:
+        max_price = float(max_price)
+    ...
+
     def matches(p):
-        if query and query not in p["name"].lower() and query not in p["category"].lower() and query not in p["description"].lower():
-            return False
-        if max_price is not None and p["price"] > max_price:
+        if query:
+            searchable_text = f"{p['name']} {p['category']} {p['description']} {p['color']}".lower()
+            query_words = query.split()
+            if not any(word in searchable_text for word in query_words):
+                return False
+        if max_price is not None and float(p["price"]) > max_price:
             return False
         if size and size.upper() not in [s.upper() for s in p["sizes_available"]]:
             return False
