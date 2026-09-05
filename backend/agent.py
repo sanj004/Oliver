@@ -23,6 +23,17 @@ MODEL_NAME = "llama3.1:8b"
 SYSTEM_PROMPT = """You are a shopping assistant for TeeStore, a small clothing store.
 You help customers find and buy products using the available tools.
 
+CRITICAL: You must NEVER write out a tool call as text in your reply (e.g. never
+write something like {"name": "confirm_payment", ...} in your message). If you need
+to use a tool, you MUST invoke it properly through the tool-calling mechanism, not
+explain it in words. If you're unsure whether to call a tool, call it -- do not
+explain what you would do instead.
+
+CRITICAL: When calling search_products, ONLY include parameters the user actually
+mentioned. Do NOT invent, guess, or default a max_price, size, or color the user
+never stated. Omit any parameter you're not sure about entirely -- an omitted
+parameter means "no filter," which is safer than guessing wrong.
+
 Rules you must always follow:
 - Never call confirm_payment unless the user has explicitly said something
   affirmative like "yes", "confirm", "go ahead" AFTER you've shown them the
@@ -83,14 +94,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "confirm_payment",
-            "description": "Charge payment for a previously created order. Only call this AFTER the user has explicitly confirmed they want to pay.",
+            "description": "Charge payment for the customer's most recent pending order in this session. Only call this AFTER the user has explicitly confirmed they want to pay. Do NOT invent or guess an order_id -- this tool automatically finds the correct pending order.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "order_id": {"type": "string"},
                     "user_confirmed": {"type": "boolean", "description": "Must be true, based on an explicit user 'yes'"},
                 },
-                "required": ["order_id", "user_confirmed"],
+                "required": ["user_confirmed"],
             },
         },
     },
@@ -144,7 +154,6 @@ def execute_tool(tool_name: str, tool_input: dict, session_id: str):
         return {"order": order}
 
     if tool_name == "confirm_payment":
-        order_id = tool_input["order_id"]
         user_confirmed = tool_input.get("user_confirmed", False)
 
         try:
@@ -155,11 +164,14 @@ def execute_tool(tool_name: str, tool_input: dict, session_id: str):
             return {"error": str(e)}
 
         session_orders = orders_db.get_orders_for_session(session_id)
-        order = next((o for o in session_orders if o["order_id"] == order_id), None)
+        pending_orders = [o for o in session_orders if o["status"] == "created"]
+        order = pending_orders[-1] if pending_orders else None
         if not order:
-            audit.log_event("confirm_payment", tool_input, {"error": "order_not_found"},
-                             "No matching order found for this session.")
-            return {"error": "Order not found."}
+            audit.log_event("confirm_payment", tool_input, {"error": "no_pending_order"},
+                             "No pending (unpaid) order found for this session.")
+            return {"error": "No pending order found. Please create an order first."}
+
+        order_id = order["order_id"]
 
         try:
             rp_order = payments.create_razorpay_order(order["total_amount"], receipt=order["order_id"])

@@ -25,5 +25,132 @@
       "count": 2
     },
     "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T01:45:57.321575+00:00",
+    "action": "search_products",
+    "input": {
+      "color": "black",
+      "max_price": 700,
+      "query": "t-shirt",
+      "size": null
+    },
+    "output": {
+      "count": 1
+    },
+    "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T01:48:19.231119+00:00",
+    "action": "create_order",
+    "input": {
+      "product_id": "p1",
+      "quantity": 1
+    },
+    "output": {
+      "order_id": "c822a497",
+      "total": 599
+    },
+    "reason": "Order created for Cotton Crew Neck Tee x1, within limits, pending payment confirmation."
+  },
+  {
+    "timestamp": "2026-09-05T01:53:37.053637+00:00",
+    "action": "search_products",
+    "input": {
+      "color": null,
+      "query": "Cotton Crew Neck Tee",
+      "size": "M",
+      "max_price": null
+    },
+    "output": {
+      "count": 3
+    },
+    "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T02:05:05.513112+00:00",
+    "action": "confirm_payment",
+    "input": {
+      "order_id": "ORDER-1234",
+      "user_confirmed": "true"
+    },
+    "output": {
+      "error": "order_not_found"
+    },
+    "reason": "No matching order found for this session."
+  },
+  {
+    "timestamp": "2026-09-05T02:05:12.123598+00:00",
+    "action": "confirm_payment",
+    "input": {
+      "order_id": "OID123",
+      "user_confirmed": "true"
+    },
+    "output": {
+      "error": "order_not_found"
+    },
+    "reason": "No matching order found for this session."
+  },
+  {
+    "timestamp": "2026-09-05T02:14:53.003443+00:00",
+    "action": "search_products",
+    "input": {
+      "query": "Cotton Crew Neck Tee",
+      "color": "",
+      "max_price": 0,
+      "size": "M"
+    },
+    "output": {
+      "count": 0
+    },
+    "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T02:21:50.863690+00:00",
+    "action": "search_products",
+    "input": {
+      "query": "Cotton Crew Neck Tee",
+      "size": "M"
+    },
+    "output": {
+      "count": 3
+    },
+    "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T02:28:40.856462+00:00",
+    "action": "confirm_payment",
+    "input": {
+      "user_confirmed": true
+    },
+    "output": {
+      "error": "no_pending_order"
+    },
+    "reason": "No pending (unpaid) order found for this session."
+  },
+  {
+    "timestamp": "2026-09-05T02:32:45.965471+00:00",
+    "action": "create_order",
+    "input": {
+      "product_id": "p1",
+      "quantity": 1
+    },
+    "output": {
+      "order_id": "c1cdbfe4",
+      "total": 599
+    },
+    "reason": "Order created for Cotton Crew Neck Tee x1, within limits, pending payment confirmation."
+  },
+  {
+    "timestamp": "2026-09-05T02:35:06.544262+00:00",
+    "action": "confirm_payment",
+    "input": {
+      "user_confirmed": true
+    },
+    "output": {
+      "razorpay_order_id": "mock_order_cae65ebdfe",
+      "status": "initiated"
+    },
+    "reason": "User explicitly confirmed; Razorpay test order created and payment initiated."
   }
 ]
