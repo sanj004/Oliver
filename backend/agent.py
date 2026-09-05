@@ -1,10 +1,11 @@
 """
 The agent brain.
-Uses Claude with tool-calling: the LLM decides which function to call
+Uses Groq (Llama 70B) with tool-calling: the LLM decides which function to call
 (search products, create order, confirm payment) based on the
 conversation, and we execute those functions server-side with
 guardrails + audit logging wrapped around every money-affecting step.
 """
+import os
 from openai import OpenAI
 import catalog
 import orders as orders_db
@@ -12,13 +13,12 @@ import payments
 import guardrails
 import audit
 
-# Ollama exposes an OpenAI-compatible API locally -- no API key needed.
 client = OpenAI(
-    base_url="http://localhost:11434/v1",
-    api_key="ollama",  # required by the library but unused by Ollama
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.environ["GROQ_API_KEY"],
 )
 
-MODEL_NAME = "llama3.1:8b"
+MODEL_NAME = "openai/gpt-oss-120b"
 
 SYSTEM_PROMPT = """You are a shopping assistant for TeeStore, a small clothing store.
 You help customers find and buy products using the available tools.
@@ -33,6 +33,16 @@ CRITICAL: When calling search_products, ONLY include parameters the user actuall
 mentioned. Do NOT invent, guess, or default a max_price, size, or color the user
 never stated. Omit any parameter you're not sure about entirely -- an omitted
 parameter means "no filter," which is safer than guessing wrong.
+
+CRITICAL: When calling create_order, you MUST use the exact product_id value
+returned by a prior search_products call. NEVER invent, guess, or construct a
+product_id yourself (e.g. do not make up SKU-style IDs like "RGT-001"). If you
+don't have a product_id from a real search result, call search_products again
+first.
+
+CRITICAL: Never state a price, product name, or availability that did not come
+from an actual search_products or create_order tool result in this conversation.
+Do not make up products or prices.
 
 Rules you must always follow:
 - Never call confirm_payment unless the user has explicitly said something
@@ -110,6 +120,17 @@ TOOLS = [
 def execute_tool(tool_name: str, tool_input: dict, session_id: str):
     """Runs the actual function behind a tool call, with guardrails + audit logging."""
 
+    # Defensive: strip unexpected keys that don't belong to this tool,
+    # since the model sometimes bleeds params from other tool schemas.
+    EXPECTED_KEYS = {
+        "search_products": {"query", "max_price", "size", "color"},
+        "get_pairing_suggestions": {"product_id"},
+        "create_order": {"product_id", "quantity"},
+        "confirm_payment": {"user_confirmed"},
+    }
+    if tool_name in EXPECTED_KEYS:
+        tool_input = {k: v for k, v in tool_input.items() if k in EXPECTED_KEYS[tool_name]}
+
     if tool_name == "search_products":
         results = catalog.search_products(
             query=tool_input.get("query", ""),
@@ -122,20 +143,26 @@ def execute_tool(tool_name: str, tool_input: dict, session_id: str):
         return {"products": results}
 
     if tool_name == "get_pairing_suggestions":
-        suggestions = catalog.get_pairing_suggestions(tool_input["product_id"])
+        suggestions = catalog.get_pairing_suggestions(tool_input.get("product_id", ""))
         audit.log_event("get_pairing_suggestions", tool_input,
                          {"suggestions": [s["id"] for s in suggestions]},
                          "Looking up complementary products for upsell.")
         return {"suggestions": suggestions}
 
     if tool_name == "create_order":
-        product = catalog.get_product(tool_input["product_id"])
+        raw_id = tool_input.get("product_id", "")
+        product = catalog.get_product(raw_id) or catalog.find_product_by_name(raw_id)
         if not product:
             audit.log_event("create_order", tool_input, {"error": "not_found"},
                              "Product ID did not match any catalog item.")
-            return {"error": f"Product {tool_input['product_id']} not found."}
+            return {"error": f"No product matches '{raw_id}'. Call search_products first and use the exact id field from a result."}
 
-        qty = tool_input["quantity"]
+        qty = tool_input.get("quantity", 1)
+        try:
+            qty = int(qty)
+        except (ValueError, TypeError):
+            qty = 1
+
         try:
             guardrails.check_stock(product, qty)
             existing_orders = orders_db.get_orders_for_session(session_id)
@@ -169,7 +196,7 @@ def execute_tool(tool_name: str, tool_input: dict, session_id: str):
         if not order:
             audit.log_event("confirm_payment", tool_input, {"error": "no_pending_order"},
                              "No pending (unpaid) order found for this session.")
-            return {"error": "No pending order found. Please create an order first."}
+            return {"error": "No pending order exists yet. You must call create_order first, then call confirm_payment."}
 
         order_id = order["order_id"]
 
@@ -190,9 +217,9 @@ def execute_tool(tool_name: str, tool_input: dict, session_id: str):
 
 def chat(session_id: str, conversation_history: list, user_message: str):
     """
-    Runs one turn of the agent loop: sends the conversation to the local
-    Ollama model, executes any tool calls, feeds results back, and
-    returns the final text reply plus the updated history.
+    Runs one turn of the agent loop: sends the conversation to Groq,
+    executes any tool calls, feeds results back, and returns the final
+    text reply plus the updated history.
     """
     if not conversation_history:
         conversation_history = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -204,6 +231,7 @@ def chat(session_id: str, conversation_history: list, user_message: str):
             model=MODEL_NAME,
             messages=messages,
             tools=TOOLS,
+            temperature=0,
         )
 
         choice = response.choices[0]

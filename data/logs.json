@@ -152,5 +152,118 @@
       "status": "initiated"
     },
     "reason": "User explicitly confirmed; Razorpay test order created and payment initiated."
+  },
+  {
+    "timestamp": "2026-09-05T02:56:51.097565+00:00",
+    "action": "search_products",
+    "input": {
+      "query": "Red Graphic Tee",
+      "size": "S"
+    },
+    "output": {
+      "count": 3
+    },
+    "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T02:59:06.063759+00:00",
+    "action": "create_order",
+    "input": {
+      "product_id": "RGT-001",
+      "quantity": 1
+    },
+    "output": {
+      "error": "not_found"
+    },
+    "reason": "Product ID did not match any catalog item."
+  },
+  {
+    "timestamp": "2026-09-05T03:04:06.958259+00:00",
+    "action": "create_order",
+    "input": {
+      "product_id": "Red Graphic Tee S",
+      "quantity": 1
+    },
+    "output": {
+      "error": "not_found"
+    },
+    "reason": "Product ID did not match any catalog item."
+  },
+  {
+    "timestamp": "2026-09-05T10:13:17.422753+00:00",
+    "action": "create_order",
+    "input": {
+      "product_id": "search_products",
+      "query": "Red Graphic Tee",
+      "size": "S",
+      "quantity": "1"
+    },
+    "output": {
+      "error": "not_found"
+    },
+    "reason": "Product ID did not match any catalog item."
+  },
+  {
+    "timestamp": "2026-09-05T10:38:53.653977+00:00",
+    "action": "search_products",
+    "input": {
+      "color": "red",
+      "query": "Red Graphic Tee",
+      "size": "S"
+    },
+    "output": {
+      "count": 1
+    },
+    "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T10:38:54.387650+00:00",
+    "action": "search_products",
+    "input": {
+      "max_price": 1000,
+      "query": "Graphic Tee"
+    },
+    "output": {
+      "count": 3
+    },
+    "reason": "User searched the catalog; returning matching products."
+  },
+  {
+    "timestamp": "2026-09-05T10:39:57.431913+00:00",
+    "action": "create_order",
+    "input": {
+      "product_id": "p1",
+      "quantity": 1
+    },
+    "output": {
+      "order_id": "6d693557",
+      "total": 599
+    },
+    "reason": "Order created for Cotton Crew Neck Tee x1, within limits, pending payment confirmation."
+  },
+  {
+    "timestamp": "2026-09-05T10:39:58.218013+00:00",
+    "action": "get_pairing_suggestions",
+    "input": {
+      "product_id": "p1"
+    },
+    "output": {
+      "suggestions": [
+        "p3"
+      ]
+    },
+    "reason": "Looking up complementary products for upsell."
+  },
+  {
+    "timestamp": "2026-09-05T10:42:10.842593+00:00",
+    "action": "confirm_payment",
+    "input": {
+      "user_confirmed": true
+    },
+    "output": {
+      "razorpay_order_id": "mock_order_b3e00cb25b",
+      "status": "initiated"
+    },
+    "reason": "User explicitly confirmed; Razorpay test order created and payment initiated."
   }
 ]

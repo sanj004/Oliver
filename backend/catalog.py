@@ -19,13 +19,29 @@ def get_product(product_id: str):
     return None
 
 
+def find_product_by_name(name: str):
+    """Fallback: case-insensitive substring match against product names.
+    Used when a caller (e.g. an LLM tool call) passes a name-like string
+    instead of a real product_id."""
+    name = (name or "").lower().strip()
+    if not name:
+        return None
+    for p in get_all_products():
+        if name in p["name"].lower() or p["name"].lower() in name:
+            return p
+    return None
+
+
 def search_products(query: str = "", max_price: float = None, size: str = None, color: str = None):
+    """
+    Simple keyword + filter search. Good enough for a hackathon demo --
+    swap for embeddings/vector search later if you want to get fancy.
+    """
     results = get_all_products()
     query = (query or "").lower().strip()
 
     if max_price is not None:
         max_price = float(max_price)
-    ...
 
     def matches(p):
         if query:

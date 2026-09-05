@@ -11,6 +11,8 @@ from pydantic import BaseModel
 import agent
 import catalog
 import audit
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI(title="TeeStore AI Shopping Agent")
 
